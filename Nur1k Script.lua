@@ -1,4 +1,4 @@
--- Полный UI-скрипт с Spinner [V] выше Close UI и рабочим таймером
+-- Полный UI-скрипт с Spinner [V] выше Close UI и рабочим таймером (Исправлен Spinner)
 local Services = setmetatable({}, {
     __index = function(self, key)
         local Service = game:GetService(key)
@@ -366,41 +366,75 @@ do
 end
 
 -- ===============================
--- SPINNER [V]
+-- SPINNER [V] (ИСПРАВЛЕННЫЙ БЛОК)
+-- Обеспечивает работу после респавна персонажа
 -- ===============================
 do
     local player = LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoid = character:WaitForChild("Humanoid")
-    local root = character:WaitForChild("HumanoidRootPart")
+    local spinnerActive = false
+    local spinning = false
 
     local rotationSpeed = 1440
     local spinDuration = 0.25
-    local spinning = false
-    local spinnerActive = false
+
+    local humanoidStateChangedConn -- Переменная для хранения подключения
+
+    local function setupSpinner(character)
+        -- Отключаем предыдущее соединение Humanoid.StateChanged, если оно есть
+        if humanoidStateChangedConn then
+            humanoidStateChangedConn:Disconnect()
+            humanoidStateChangedConn = nil
+        end
+        
+        -- Получаем новый Humanoid и RootPart нового персонажа
+        local humanoid = character:WaitForChild("Humanoid")
+        local root = character:WaitForChild("HumanoidRootPart")
+
+        -- Подключаем логику вращения к новому Humanoid
+        humanoidStateChangedConn = humanoid.StateChanged:Connect(function(_, newState)
+            if newState == Enum.HumanoidStateType.Jumping and spinnerActive and not spinning then
+                spinning = true
+                
+                -- Логика вращения
+                local rotVelocity = Instance.new("BodyAngularVelocity")
+                rotVelocity.AngularVelocity = Vector3.new(0, math.rad(rotationSpeed), 0)
+                rotVelocity.MaxTorque = Vector3.new(0, math.huge, 0)
+                rotVelocity.P = 1000
+                rotVelocity.Parent = root
+                
+                task.delay(spinDuration, function()
+                    -- Проверка, что rotVelocity еще существует, прежде чем уничтожить
+                    if rotVelocity.Parent then 
+                        rotVelocity:Destroy()
+                    end
+                    spinning = false
+                end)
+            end
+        end)
+    end
 
     local function toggleSpinner()
         spinnerActive = not spinnerActive
         toggleButtonState(spinnerButton, spinnerStroke, spinnerActive)
     end
 
+    -- 1. Подключаем кнопку и клавишу
     spinnerButton.MouseButton1Click:Connect(toggleSpinner)
     RegisterKeybind(Enum.KeyCode.V, toggleSpinner)
 
-    humanoid.StateChanged:Connect(function(_, newState)
-        if newState == Enum.HumanoidStateType.Jumping and spinnerActive and not spinning then
-            spinning = true
-            local rotVelocity = Instance.new("BodyAngularVelocity")
-            rotVelocity.AngularVelocity = Vector3.new(0, math.rad(rotationSpeed), 0)
-            rotVelocity.MaxTorque = Vector3.new(0, math.huge, 0)
-            rotVelocity.P = 1000
-            rotVelocity.Parent = root
-            task.delay(spinDuration, function()
-                rotVelocity:Destroy()
-                spinning = false
-            end)
-        end
-    end)
+    local function onCharacterAdded(character)
+        setupSpinner(character)
+    end
+    
+    -- 2. Обрабатываем появление персонажа (первый вход и респавн)
+    
+    -- Для первого спавна: если персонаж уже есть, настраиваем спиннер
+    if player.Character then
+        task.defer(onCharacterAdded, player.Character)
+    end
+
+    -- Для всех последующих респавнов: подключаемся к событию CharacterAdded
+    player.CharacterAdded:Connect(onCharacterAdded)
 end
 
 -- ===============================
