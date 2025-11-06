@@ -1,10 +1,11 @@
 -- ======================================
--- Полный UI-скрипт с Jump Fix (6.6) [X]
+-- Полный UI-скрипт с Jump Fix (6.6) [X] + ⚙️ Bind Settings
+-- Включена функция прокрутки для ButtonContainer
 -- ======================================
 local Services = setmetatable({}, {
     __index = function(self, key)
         local Service = game:GetService(key)
-        rawset(self, self, Service)
+        rawset(self, key, Service)
         return Service
     end
 })
@@ -16,9 +17,15 @@ local UserInputService = Services.UserInputService
 local LocalPlayer = Players.LocalPlayer
 local Workspace = Services.Workspace
 
--- КОНСТАНТЫ JUMP FIX
+-- КОНСТАНТЫ / НАСТРОЙКИ (сделаны изменяемыми)
 local DEFAULT_JUMP_HEIGHT = 7.2
 local TARGET_JUMP_HEIGHT = 6.6 
+local baseSpeed = 24 -- вынес наружу, чтобы Bind мог менять
+
+-- Цвета
+local ACTIVE_COLOR = Color3.fromRGB(0, 150, 75)
+local INACTIVE_COLOR = Color3.fromRGB(25, 25, 30)
+local STROKE_COLOR = Color3.fromRGB(0, 200, 255)
 
 -- GUI
 local screenGui = Instance.new("ScreenGui")
@@ -42,7 +49,7 @@ mainCorner.CornerRadius = UDim.new(0, 10)
 mainCorner.Parent = mainFrame
 
 local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(0, 200, 255)
+mainStroke.Color = STROKE_COLOR
 mainStroke.Thickness = 2
 mainStroke.Transparency = 0.2
 mainStroke.Parent = mainFrame
@@ -62,7 +69,7 @@ titleLabel.Parent = mainFrame
 local titleLine = Instance.new("Frame")
 titleLine.Size = UDim2.new(1, -20, 0, 2)
 titleLine.Position = UDim2.new(0, 10, 0, 36)
-titleLine.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+titleLine.BackgroundColor3 = STROKE_COLOR
 titleLine.BorderSizePixel = 0
 titleLine.Parent = mainFrame
 
@@ -77,11 +84,22 @@ statusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Right
 statusLabel.Parent = mainFrame
 
-local buttonContainer = Instance.new("Frame")
+-- ===============================================
+-- SCROLLINGFRAME (Контейнер с прокруткой)
+-- ===============================================
+local buttonContainer = Instance.new("ScrollingFrame")
 buttonContainer.Size = UDim2.new(1, -10, 1, -120) 
 buttonContainer.Position = UDim2.new(0, 5, 0, 45)
 buttonContainer.BackgroundTransparency = 1
 buttonContainer.Parent = mainFrame
+
+-- Настройки прокрутки
+buttonContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+buttonContainer.ScrollBarThickness = 8
+buttonContainer.ScrollBarImageColor3 = STROKE_COLOR
+buttonContainer.HorizontalScrollBarInset = Enum.ScrollBarInset.None
+buttonContainer.VerticalScrollBarInset = Enum.ScrollBarInset.None
+buttonContainer.ScrollingDirection = Enum.ScrollingDirection.Y
 
 local layout = Instance.new("UIListLayout")
 layout.Padding = UDim.new(0, 8)
@@ -91,55 +109,11 @@ layout.VerticalAlignment = Enum.VerticalAlignment.Top
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Parent = buttonContainer
 
-local function createButton(name, icon)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 36)
-    button.Text = icon .. " " .. name
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 14
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    button.AutoButtonColor = false
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = button
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 200, 255)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.7
-    stroke.Parent = button
-
-    button.Parent = buttonContainer
-
-    button.MouseEnter:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.1), { BackgroundColor3 = Color3.fromRGB(35, 35, 40) }):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.1), { Transparency = 0.5 }):Play()
-    end)
-
-    button.MouseLeave:Connect(function()
-        if button.BackgroundColor3 == ACTIVE_COLOR then return end
-        TweenService:Create(button, TweenInfo.new(0.1), { BackgroundColor3 = Color3.fromRGB(25, 25, 30) }):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.1), { Transparency = 0.7 }):Play()
-    end)
-
-    return button, stroke
-end
-
--- Создаём кнопки
-local speedButton, speedStroke = createButton("Speed Boost (x1.5) [Q]", "⚡")
--- >>> НОВАЯ КНОПКА JUMP FIX 6.6 <<<
-local jumpFixButton, jumpFixStroke = createButton("Jump Fix (6.6) [X]", "⬆️") 
-local floorButton, floorStroke = createButton("3rd Floor Glitch [C]", "🏢")
-local espButton, espStroke = createButton("ESP Players [P]", "👁️")
-local spinnerButton, spinnerStroke = createButton("Spinner [V]", "🔄")
-local closeButton, closeStroke = createButton("Close UI [B]", "🗑")
-
--- Цвета
-local ACTIVE_COLOR = Color3.fromRGB(0, 150, 75)
-local INACTIVE_COLOR = Color3.fromRGB(25, 25, 30)
-local STROKE_COLOR = Color3.fromRGB(0, 200, 255)
+-- АВТОМАТИЧЕСКАЯ ПОДГОНКА CANVASSIZE (для работы прокрутки)
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    buttonContainer.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+end)
+-- ===============================================
 
 local function toggleButtonState(button, stroke, isActive)
     if isActive then
@@ -153,6 +127,54 @@ local function toggleButtonState(button, stroke, isActive)
     end
 end
 
+local function createButton(name, icon)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 36)
+    button.Text = icon .. " " .. name
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 14
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundColor3 = INACTIVE_COLOR 
+    button.AutoButtonColor = false
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = STROKE_COLOR
+    stroke.Thickness = 1
+    stroke.Transparency = 0.7
+    stroke.Parent = button
+
+    button.Parent = buttonContainer -- Родитель - ScrollingFrame
+
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.1), { BackgroundColor3 = Color3.fromRGB(35, 35, 40) }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.1), { Transparency = 0.5 }):Play()
+    end)
+
+    button.MouseLeave:Connect(function()
+        if button.BackgroundColor3 == ACTIVE_COLOR then return end
+        TweenService:Create(button, TweenInfo.new(0.1), { BackgroundColor3 = INACTIVE_COLOR }):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.1), { Transparency = 0.7 }):Play()
+    end)
+
+    return button, stroke
+end
+
+-- Создаём КНОПКИ (ТОЛЬКО ОСНОВНЫЕ)
+local speedButton, speedStroke = createButton("Speed Boost (x1.5) [Q]", "⚡")
+local jumpFixButton, jumpFixStroke = createButton("Jump Fix (6.6) [X]", "⬆️") 
+local floorButton, floorStroke = createButton("3rd Floor Glitch [C]", "🏢")
+local espButton, espStroke = createButton("ESP Players [P]", "👁️")
+local spinnerButton, spinnerStroke = createButton("Spinner [V]", "🔄")
+
+local bindButton, bindStroke = createButton("Bind", "⚙️") 
+local closeButton, closeStroke = createButton("Close UI [B]", "🗑")
+
+-- ТЕСТОВЫЕ КНОПКИ УДАЛЕНЫ
+
 local externalKeybinds = {}
 
 local function RegisterKeybind(keyCode, callback)
@@ -164,7 +186,6 @@ end
 -- ===============================
 do
     local speedConn
-    local baseSpeed = 24
     local active = false
 
     local function GetCharacter()
@@ -322,7 +343,7 @@ do
     local ESP_CONTAINER = {}
     local espActive = false
     local MAX_DISTANCE = 200
-    local ESP_COLOR = Color3.fromRGB(0, 200, 255)
+    local ESP_COLOR = STROKE_COLOR
     local espConnection
 
     local function clearESP(player)
@@ -474,8 +495,148 @@ do
 end
 
 -- ===============================
--- TOGGLE UI BUTTON (Для скрытия/показа)
+-- Settings Frame (для ⚙️ Bind)
 -- ===============================
+do
+    local settingsFrame = Instance.new("Frame")
+    settingsFrame.Name = "BindSettingsFrame"
+    settingsFrame.Size = UDim2.new(0, 160, 0, 120)
+    settingsFrame.Position = UDim2.new(0, -180, 0, 60)
+    settingsFrame.AnchorPoint = Vector2.new(0, 0)
+    settingsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    settingsFrame.BorderSizePixel = 0
+    settingsFrame.Parent = mainFrame
+    settingsFrame.Visible = false
+    settingsFrame.BackgroundTransparency = 1
+
+    local settingsCorner = Instance.new("UICorner")
+    settingsCorner.CornerRadius = UDim.new(0, 8)
+    settingsCorner.Parent = settingsFrame
+
+    local settingsStroke = Instance.new("UIStroke")
+    settingsStroke.Color = STROKE_COLOR
+    settingsStroke.Thickness = 1
+    settingsStroke.Parent = settingsFrame
+
+    -- Label Speed
+    local speedLabel = Instance.new("TextLabel")
+    speedLabel.Size = UDim2.new(0, 70, 0, 22)
+    speedLabel.Position = UDim2.new(0, 10, 0, 10)
+    speedLabel.BackgroundTransparency = 1
+    speedLabel.Font = Enum.Font.GothamBold
+    speedLabel.TextSize = 14
+    speedLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    speedLabel.Text = "Speed:"
+    speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    speedLabel.Parent = settingsFrame
+
+    local speedBox = Instance.new("TextBox")
+    speedBox.Size = UDim2.new(0, 70, 0, 24)
+    speedBox.Position = UDim2.new(0, 80, 0, 8)
+    speedBox.BackgroundColor3 = INACTIVE_COLOR
+    speedBox.TextColor3 = Color3.fromRGB(255,255,255)
+    speedBox.TextSize = 14
+    speedBox.Font = Enum.Font.Gotham
+    speedBox.Text = tostring(baseSpeed)
+    speedBox.ClearTextOnFocus = false
+    speedBox.Parent = settingsFrame
+    local sbCorner = Instance.new("UICorner"); sbCorner.Parent = speedBox
+
+    -- Label Jump
+    local jumpLabel = Instance.new("TextLabel")
+    jumpLabel.Size = UDim2.new(0, 70, 0, 22)
+    jumpLabel.Position = UDim2.new(0, 10, 0, 42)
+    jumpLabel.BackgroundTransparency = 1
+    jumpLabel.Font = Enum.Font.GothamBold
+    jumpLabel.TextSize = 14
+    jumpLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    jumpLabel.Text = "Jump:"
+    jumpLabel.TextXAlignment = Enum.TextXAlignment.Left
+    jumpLabel.Parent = settingsFrame
+
+    local jumpBox = Instance.new("TextBox")
+    jumpBox.Size = UDim2.new(0, 70, 0, 24)
+    jumpBox.Position = UDim2.new(0, 80, 0, 40)
+    jumpBox.BackgroundColor3 = INACTIVE_COLOR
+    jumpBox.TextColor3 = Color3.fromRGB(255,255,255)
+    jumpBox.TextSize = 14
+    jumpBox.Font = Enum.Font.Gotham
+    jumpBox.Text = tostring(TARGET_JUMP_HEIGHT)
+    jumpBox.ClearTextOnFocus = false
+    jumpBox.Parent = settingsFrame
+    local jbCorner = Instance.new("UICorner"); jbCorner.Parent = jumpBox
+
+    -- Apply button
+    local applyBtn = Instance.new("TextButton")
+    applyBtn.Size = UDim2.new(0, 140, 0, 28)
+    applyBtn.Position = UDim2.new(0, 10, 0, 74)
+    applyBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+    applyBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    applyBtn.Font = Enum.Font.GothamBold
+    applyBtn.TextSize = 14
+    applyBtn.Text = "Apply"
+    applyBtn.Parent = settingsFrame
+    local applyCorner = Instance.new("UICorner"); applyCorner.Parent = applyBtn
+
+    -- Toggle (fade) для settingsFrame
+    local settingsVisible = false
+    local function toggleSettingsFrame()
+        if not settingsVisible then
+            settingsFrame.Visible = true
+            settingsFrame.BackgroundTransparency = 1
+            TweenService:Create(settingsFrame, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 0.1}):Play()
+            settingsVisible = true
+        else
+            TweenService:Create(settingsFrame, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+            task.delay(0.25, function()
+                settingsFrame.Visible = false
+            end)
+            settingsVisible = false
+        end
+    end
+
+    -- Привязываем toggle к bindButton
+    bindButton.MouseButton1Click:Connect(function()
+        toggleSettingsFrame()
+    end)
+
+    -- Apply: поменять baseSpeed и TARGET_JUMP_HEIGHT и применить на текущем Humanoid (если есть)
+    applyBtn.MouseButton1Click:Connect(function()
+        local s = tonumber(speedBox.Text)
+        local j = tonumber(jumpBox.Text)
+        if s and s > 0 then
+            baseSpeed = s
+        else
+            speedBox.Text = tostring(baseSpeed) -- Вернуть старое значение, если ввод неверный
+        end
+        if j and j > 0 then
+            TARGET_JUMP_HEIGHT = j
+        else
+            jumpBox.Text = tostring(TARGET_JUMP_HEIGHT) -- Вернуть старое значение
+        end
+
+        -- Применим сразу на текущем персонаже (Humanoid / HumanoidRootPart)
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                -- Для Jump: set JumpHeight (и на будущее при респавне будет применяться)
+                hum.JumpHeight = TARGET_JUMP_HEIGHT
+                -- Для Speed: поменяем WalkSpeed, что также повлияет на логику Speed Boost
+                hum.WalkSpeed = baseSpeed
+            end
+        end
+
+        -- Короткое подтверждение (меняет текст кнопки на 1.2с)
+        local original = applyBtn.Text
+        applyBtn.Text = "Applied ✓"
+        task.delay(1.2, function() applyBtn.Text = original end)
+    end)
+end
+
+-- ===============================
+-- TOGGLE UI BUTTON (Для скрытия/показа)
+-- ===================================
 local toggleUIButton = Instance.new("TextButton")
 toggleUIButton.Name = "ToggleUI"
 toggleUIButton.Size = UDim2.new(0, 20, 0, 20)
@@ -486,7 +647,7 @@ toggleUIButton.BorderSizePixel = 0
 toggleUIButton.Text = "🔓" 
 toggleUIButton.Font = Enum.Font.Code
 toggleUIButton.TextSize = 16
-toggleUIButton.TextColor3 = Color3.fromRGB(0, 200, 255)
+toggleUIButton.TextColor3 = STROKE_COLOR
 toggleUIButton.TextScaled = true
 toggleUIButton.Parent = screenGui 
 
@@ -495,7 +656,7 @@ toggleCorner.CornerRadius = UDim.new(0, 6)
 toggleCorner.Parent = toggleUIButton
 
 local toggleStroke = Instance.new("UIStroke")
-toggleStroke.Color = Color3.fromRGB(0, 200, 255)
+toggleStroke.Color = STROKE_COLOR
 toggleStroke.Thickness = 2
 toggleStroke.Transparency = 0.2
 toggleStroke.Parent = toggleUIButton
